@@ -17,9 +17,13 @@ ULiveLinkFaceCSVWriterComponent::ULiveLinkFaceCSVWriterComponent()
     , bHeaderWritten(false)
     , LiveLinkClient(nullptr)
 {
-    // Enable ticking (but start disabled until recording)
-    PrimaryComponentTick.bCanEverTick = true;
-    PrimaryComponentTick.bStartWithTickEnabled = false;
+    // --- enable ticking ---
+    PrimaryComponentTick.bCanEverTick = true;   // allow this component to ever tick
+    PrimaryComponentTick.bStartWithTickEnabled = false;  // only start ticking when StartRecording() calls SetComponentTickEnabled(true)
+
+    // --- this lives on the component itself ---
+    bTickInEditor = true;   // run TickComponent() even when not in PIE
+    bAutoActivate = false;
 }
 
 void ULiveLinkFaceCSVWriterComponent::BeginPlay()
