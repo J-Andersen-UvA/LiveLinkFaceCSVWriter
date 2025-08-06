@@ -245,13 +245,13 @@ void ULiveLinkFaceCSVWriterComponent::CaptureFrame()
         Cols.Add(FString::FromInt(BaseFrameData->PropertyValues.Num()));
         for (float V : BaseFrameData->PropertyValues)
         {
-            Cols.Add(FString::SanitizeFloat(V));
+            Cols.Add(FString::Printf(TEXT("%.10f"), V));
         }
     }
     else
     {
         // Fallback - just add the count as 0
-        Cols.Add(TEXT("0"));
+        Cols.Add(FString::Printf(TEXT("%.10f"), 0.0f));
     }
 
     CSVRows.Add(FString::Join(Cols, TEXT(",")));
