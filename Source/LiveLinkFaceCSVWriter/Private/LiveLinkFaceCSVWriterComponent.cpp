@@ -254,7 +254,18 @@ void ULiveLinkFaceCSVWriterComponent::CaptureFrame()
         Cols.Add(FString::Printf(TEXT("%.10f"), 0.0f));
     }
 
-    CSVRows.Add(FString::Join(Cols, TEXT(",")));
+    // Join into a CSV line
+    const FString NewLine = FString::Join(Cols, TEXT(","));
+
+    // Compare to last row—if identical, skip
+    if (CSVRows.Num() > 0 && CSVRows.Last() == NewLine)
+    {
+        // duplicate frame: do nothing
+        return;
+    }
+
+    // otherwise append
+    CSVRows.Add(NewLine);
 }
 
 FString ULiveLinkFaceCSVWriterComponent::FormatTimecode(const FQualifiedFrameTime& QT) const
