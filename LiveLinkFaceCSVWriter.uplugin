@@ -1,0 +1,22 @@
+{
+    "FileVersion": 3,
+    "Version": 1,
+    "VersionName": "1.0",
+    "FriendlyName": "Live Link Face CSV Writer",
+    "Description": "A plugin to write the data coming in from a Live Link Face",
+    "Category": "Hardware",
+    "CreatedBy": "ToucheToucan",
+    "CreatedByURL": "",
+    "DocsURL": "",
+    "MarketplaceURL": "",
+    "SupportURL": "",
+    "EnabledByDefault": true,
+    "SupportedTargetPlatforms": [ "Win64" ],
+    "Modules": [
+        {
+            "Name": "LiveLinkFaceCSVWriter",
+            "Type": "Runtime",
+            "LoadingPhase": "PreDefault"
+        }
+    ]
+}
