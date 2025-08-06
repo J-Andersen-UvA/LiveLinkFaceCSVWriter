@@ -1,14 +1,13 @@
 #pragma once
-
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "LiveLinkClientReference.h"
 #include "LiveLinkTypes.h"
-#include "Roles/LiveLinkBasicRole.h"
+#include "LiveLinkRole.h"
 #include "LiveLinkFaceCSVWriterComponent.generated.h"
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class LiveLinkFaceCSVWriter_API ULiveLinkFaceCSVWriterComponent : public UActorComponent
+class LIVELINKFACECSVWRITER_API ULiveLinkFaceCSVWriterComponent : public UActorComponent
 {
     GENERATED_BODY()
 
@@ -19,7 +18,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
     void SetSubjectName(const FName& InSubjectName);
 
-    /** Set output CSV filename (will append “.csv” if missing) */
+    /** Set output CSV filename (will append ".csv" if missing) */
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
     void SetFilename(const FString& InFilename);
 
@@ -41,24 +40,36 @@ protected:
                                FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+    /** LiveLink subject to sample */
     FName SubjectName;
 
+    /** CSV filename (just name.csv, saved under Saved/LiveLinkExports/) */
     FString Filename;
 
+    /** Are we actively recording? */
     bool bIsRecording;
 
+    /** Has the header row already been written? */
     bool bHeaderWritten;
-    TArray<FString> CSVRows;
-    TArray<FName> CurveNames;
-    TArray<double> LastCurveValues;
 
+    /** In-memory CSV rows (first is header) */
+    TArray<FString> CSVRows;
+
+    /** Curve names extracted from static data */
+    TArray<FName> CurveNames;
+
+    /** Cached LiveLink client pointer */
     ILiveLinkClient* LiveLinkClient;
 
+    /** Pull static data and write header row */
     bool InitializeCSVHeader();
 
     /** Sample one frame and append to CSVRows */
     void CaptureFrame();
 
-    /** Format SMPTE timecode + subframe as “HH:MM:SS:FF.mmm” */
+    /** Format SMPTE timecode + subframe as "HH:MM:SS:FF.mmm" */
     FString FormatTimecode(const FQualifiedFrameTime& QT) const;
+
+    /** Get LiveLink client without including subsystem header */
+    ILiveLinkClient* GetLiveLinkClient() const;
 };

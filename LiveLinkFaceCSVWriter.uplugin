@@ -16,7 +16,13 @@
         {
             "Name": "LiveLinkFaceCSVWriter",
             "Type": "Runtime",
-            "LoadingPhase": "PreDefault"
+            "LoadingPhase": "Default"
+        }
+    ],
+    "Plugins": [
+        {
+            "Name": "LiveLink",
+            "Enabled": true
         }
     ]
 }

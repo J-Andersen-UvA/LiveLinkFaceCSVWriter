@@ -1,49 +1,49 @@
-﻿// LiveLinkFaceCSVWriter.Build.cs
-
-using UnrealBuildTool;
-using System.Collections.Generic;
+﻿using UnrealBuildTool;
 
 public class LiveLinkFaceCSVWriter : ModuleRules
 {
     public LiveLinkFaceCSVWriter(ReadOnlyTargetRules Target) : base(Target)
     {
-        // Use explicit or shared PCHs for faster compile times
-        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        // Expose our Public headers to other modules
         PublicIncludePaths.AddRange(
             new string[] {
-                "LiveLinkFaceCSVWriter/Public"
+                // ... add public include paths required here ...
             }
         );
 
-        // Our own Private headers
         PrivateIncludePaths.AddRange(
             new string[] {
-                "LiveLinkFaceCSVWriter/Private"
+                // ... add other private include paths required here ...
             }
         );
 
-        // These are the modules we depend on at runtime
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
-                "Core",              // Core engine types & utilities
-                "CoreUObject",       // UObject system
-                "Engine",            // FPaths, FFileHelper, IFileManager
-                "LiveLink",          // FLiveLinkClientReference, FLiveLinkClient
-                "LiveLinkInterface"  // ILiveLinkClient, FLiveLinkSubjectFrameData, roles
+                "Core",
+                "CoreUObject",
+                "Engine",
+                "LiveLinkInterface",
+                "LiveLink",
+                "TimeManagement"
             }
         );
 
-        // No extra Editor or Slate deps needed for pure runtime CSV writing
         PrivateDependencyModuleNames.AddRange(
-            new string[] { }
+            new string[]
+            {
+                "LiveLinkInterface",
+                "LiveLink",
+                "TimeManagement"
+            }
         );
 
-        // No dynamically loaded modules
         DynamicallyLoadedModuleNames.AddRange(
-            new string[] { }
+            new string[]
+            {
+                // ... add any modules that your module loads dynamically here ...
+            }
         );
     }
 }

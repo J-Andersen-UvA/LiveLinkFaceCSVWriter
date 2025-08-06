@@ -2,7 +2,13 @@
 #include "Misc/Paths.h"
 #include "Misc/FileHelper.h"
 #include "HAL/PlatformFilemanager.h"
-#include "FMath.h"
+#include "Engine/Engine.h"
+#include "Math/UnrealMathUtility.h"
+#include "LiveLinkClientReference.h"
+#include "ILiveLinkClient.h"
+//#include "Roles/LiveLinkFaceRole.h"
+#include "Roles/LiveLinkBasicRole.h"
+
 
 ULiveLinkFaceCSVWriterComponent::ULiveLinkFaceCSVWriterComponent()
     : SubjectName(NAME_None)
@@ -14,15 +20,14 @@ ULiveLinkFaceCSVWriterComponent::ULiveLinkFaceCSVWriterComponent()
     // Enable ticking (but start disabled until recording)
     PrimaryComponentTick.bCanEverTick = true;
     PrimaryComponentTick.bStartWithTickEnabled = false;
-
-    // Cache the LiveLink client
-    LiveLinkClient = FLiveLinkClientReference::GetClient();
-    check(LiveLinkClient);
 }
 
 void ULiveLinkFaceCSVWriterComponent::BeginPlay()
 {
     Super::BeginPlay();
+
+    // We'll get the client dynamically when needed
+    LiveLinkClient = nullptr;
 }
 
 void ULiveLinkFaceCSVWriterComponent::TickComponent(float DeltaTime, ELevelTick TickType,
@@ -36,7 +41,6 @@ void ULiveLinkFaceCSVWriterComponent::TickComponent(float DeltaTime, ELevelTick 
         {
             if (!InitializeCSVHeader())
             {
-                // Failed to write header; stop recording
                 StopRecording();
                 return;
             }
@@ -69,7 +73,6 @@ bool ULiveLinkFaceCSVWriterComponent::StartRecording()
         return false;
     }
 
-    // Enable TickComponent
     bIsRecording = true;
     bHeaderWritten = false;
     CSVRows.Empty();
@@ -94,7 +97,6 @@ bool ULiveLinkFaceCSVWriterComponent::ExportFile()
         return false;
     }
 
-    // Save under Saved/LiveLinkExports/
     const FString FullPath = FPaths::ProjectSavedDir() / TEXT("LiveLinkExports") / Filename;
     const FString Dir = FPaths::GetPath(FullPath);
     IPlatformFile& PF = FPlatformFileManager::Get().GetPlatformFile();
@@ -107,7 +109,7 @@ bool ULiveLinkFaceCSVWriterComponent::ExportFile()
     if (FFileHelper::SaveStringToFile(Content, *FullPath))
     {
         UE_LOG(LogTemp, Log, TEXT("LiveLink CSV Writer: Exported %d rows to %s"),
-               CSVRows.Num(), *FullPath);
+            CSVRows.Num(), *FullPath);
         return true;
     }
     else
@@ -117,31 +119,77 @@ bool ULiveLinkFaceCSVWriterComponent::ExportFile()
     }
 }
 
+ILiveLinkClient* ULiveLinkFaceCSVWriterComponent::GetLiveLinkClient() const
+{
+    // Use the static LiveLink client reference approach
+    FLiveLinkClientReference ClientRef;
+    return ClientRef.GetClient();
+}
+
 bool ULiveLinkFaceCSVWriterComponent::InitializeCSVHeader()
 {
-    if (SubjectName.IsNone() || !LiveLinkClient)
+    if (SubjectName.IsNone())
     {
         return false;
     }
 
+    ILiveLinkClient* Client = GetLiveLinkClient();
+    if (!Client)
+    {
+        UE_LOG(LogTemp, Error, TEXT("LiveLink CSV Writer: Could not get LiveLink client"));
+        return false;
+    }
+
+    // Get the list of subjects to verify our subject exists
+    TArray<FLiveLinkSubjectKey> Subjects = Client->GetSubjects(true, true);
+    bool bSubjectFound = false;
+    for (const FLiveLinkSubjectKey& Subject : Subjects)
+    {
+        if (Subject.SubjectName == SubjectName)
+        {
+            bSubjectFound = true;
+            break;
+        }
+    }
+
+    if (!bSubjectFound)
+    {
+        UE_LOG(LogTemp, Error, TEXT("LiveLink CSV Writer: Subject '%s' not found"), *SubjectName.ToString());
+        return false;
+    }
+
     FLiveLinkSubjectFrameData FrameData;
-    if (!LiveLinkClient->EvaluateFrame_AnyThread(
-            SubjectName,
-            ULiveLinkBasicRole::StaticClass(),
-            FrameData))
+    //if (!Client->EvaluateFrame_AnyThread(SubjectName, ULiveLinkFaceRole::StaticClass(), FrameData))
+    if (!Client->EvaluateFrame_AnyThread(SubjectName, ULiveLinkBasicRole::StaticClass(), FrameData))
     {
         UE_LOG(LogTemp, Error, TEXT("LiveLink CSV Writer: Failed to evaluate frame for header"));
         return false;
     }
 
-    // Extract curve names
-    CurveNames = FrameData.StaticData.CurveNames;
+    // Try to extract curve names from static data
+    if (const FLiveLinkBaseStaticData* BaseStaticData = FrameData.StaticData.Cast<FLiveLinkBaseStaticData>())
+    {
+        CurveNames = BaseStaticData->PropertyNames;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("LiveLink CSV Writer: Could not get property names, using indices"));
+        // Fallback: create generic names
+        if (const FLiveLinkBaseFrameData* BaseFrameData = FrameData.FrameData.Cast<FLiveLinkBaseFrameData>())
+        {
+            CurveNames.Empty();
+            for (int32 i = 0; i < BaseFrameData->PropertyValues.Num(); ++i)
+            {
+                CurveNames.Add(*FString::Printf(TEXT("Property_%d"), i));
+            }
+        }
+    }
+
     const int32 NumCurves = CurveNames.Num();
 
-    // Build header row
     TArray<FString> HeaderCols;
     HeaderCols.Add(TEXT("Timecode"));
-    HeaderCols.Add(FString::FromInt(NumCurves));
+    HeaderCols.Add(TEXT("NumProperties"));
     for (const FName& N : CurveNames)
     {
         HeaderCols.Add(N.ToString());
@@ -151,52 +199,70 @@ bool ULiveLinkFaceCSVWriterComponent::InitializeCSVHeader()
     CSVRows.Add(FString::Join(HeaderCols, TEXT(",")));
     bHeaderWritten = true;
 
-    UE_LOG(LogTemp, Log, TEXT("LiveLink CSV Writer: Header initialized (%d curves)"), NumCurves);
+    UE_LOG(LogTemp, Log, TEXT("LiveLink CSV Writer: Header initialized (%d properties)"), NumCurves);
     return true;
 }
 
 void ULiveLinkFaceCSVWriterComponent::CaptureFrame()
 {
-    if (!LiveLinkClient || SubjectName.IsNone())
+    if (SubjectName.IsNone())
+    {
+        return;
+    }
+
+    ILiveLinkClient* Client = GetLiveLinkClient();
+    if (!Client)
     {
         return;
     }
 
     FLiveLinkSubjectFrameData FrameData;
-    if (!LiveLinkClient->EvaluateFrame_AnyThread(
-            SubjectName,
-            ULiveLinkBasicRole::StaticClass(),
-            FrameData))
+    if (!Client->EvaluateFrame_AnyThread(SubjectName, ULiveLinkBasicRole::StaticClass(), FrameData))
     {
         return;
     }
 
-    // If this tick’s values exactly match the last tick, skip writing
-    if (LastCurveValues.Num() == FrameData.CurveElements.Num() &&
-        LastCurveValues == FrameData.CurveElements)
+    TArray<FString> Cols;
+
+    FLiveLinkSubjectFrameData SubjectFrameData;
+    if (Client->EvaluateFrame_AnyThread(SubjectName, ULiveLinkBasicRole::StaticClass(), SubjectFrameData))
     {
-        return;  // no change, bail out
+        const FLiveLinkBaseFrameData* BaseFrame = SubjectFrameData.FrameData.GetBaseData();
+        if (BaseFrame)
+        {
+            // BaseFrame->MetaData.SceneTime is an FQualifiedFrameTime
+            Cols.Add(FormatTimecode(BaseFrame->MetaData.SceneTime));
+        }
     }
 
-    TArray<FString> Cols;
-    // Timecode
-    Cols.Add(FormatTimecode(FrameData.MetaData.SceneTime));
-    // Count
-    Cols.Add(FString::FromInt(FrameData.CurveElements.Num()));
-    // Values
-    for (double V : FrameData.CurveElements)
+    // Extract property values from the frame data
+    if (const FLiveLinkBaseFrameData* BaseFrameData = FrameData.FrameData.Cast<FLiveLinkBaseFrameData>())
     {
-        Cols.Add(FString::SanitizeFloat(V));
+        Cols.Add(FString::FromInt(BaseFrameData->PropertyValues.Num()));
+        for (float V : BaseFrameData->PropertyValues)
+        {
+            Cols.Add(FString::SanitizeFloat(V));
+        }
+    }
+    else
+    {
+        // Fallback - just add the count as 0
+        Cols.Add(TEXT("0"));
     }
 
     CSVRows.Add(FString::Join(Cols, TEXT(",")));
-    LastCurveValues = FrameData.CurveElements;
 }
 
 FString ULiveLinkFaceCSVWriterComponent::FormatTimecode(const FQualifiedFrameTime& QT) const
 {
-    const auto& TC = QT.Timecode;
-    int32 Millis = FMath::RoundToInt(TC.SubFrame * 1000.0f);
-    return FString::Printf(TEXT("%02d:%02d:%02d:%02d.%03d"),
-                           TC.Hours, TC.Minutes, TC.Seconds, TC.Frames, Millis);
+    // Instead of QT.Time.GetTimecode(), use QT.ToTimecode():
+    FTimecode TC = QT.ToTimecode();  // :contentReference[oaicite:0]{index=0}
+
+    // Compute milliseconds from the fractional sub-frame:
+    int32 Millis = FMath::RoundToInt(QT.Time.GetSubFrame() * 1000.0f / QT.Rate.AsDecimal());
+
+    return FString::Printf(
+        TEXT("%02d:%02d:%02d:%02d.%03d"),
+        TC.Hours, TC.Minutes, TC.Seconds, TC.Frames, Millis
+    );
 }
