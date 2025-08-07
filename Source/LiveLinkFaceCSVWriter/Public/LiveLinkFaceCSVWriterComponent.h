@@ -37,6 +37,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
     bool ExportFile();
 
+    UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
+    FString GetSaveFolder() const;
+
 protected:
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, 

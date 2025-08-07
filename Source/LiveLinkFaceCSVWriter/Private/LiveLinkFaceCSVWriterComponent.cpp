@@ -86,6 +86,11 @@ void ULiveLinkFaceCSVWriterComponent::SetSaveFolder(const FString& InFolderPath)
     UE_LOG(LogTemp, Log, TEXT("LiveLink CSV Writer: Export folder set to %s"), *ExportFolder);
 }
 
+FString ULiveLinkFaceCSVWriterComponent::GetSaveFolder() const
+{
+    return ExportFolder;
+}
+
 bool ULiveLinkFaceCSVWriterComponent::StartRecording()
 {
     if (SubjectName.IsNone())
