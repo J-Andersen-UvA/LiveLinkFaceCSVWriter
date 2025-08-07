@@ -13,6 +13,7 @@
 ULiveLinkFaceCSVWriterComponent::ULiveLinkFaceCSVWriterComponent()
     : SubjectName(NAME_None)
     , Filename(TEXT("LiveLinkFaceData.csv"))
+    , ExportFolder(FPaths::ProjectSavedDir() / TEXT("LiveLinkExports"))
     , bIsRecording(false)
     , bHeaderWritten(false)
     , LiveLinkClient(nullptr)
@@ -69,6 +70,22 @@ void ULiveLinkFaceCSVWriterComponent::SetFilename(const FString& InFilename)
     UE_LOG(LogTemp, Log, TEXT("LiveLink CSV Writer: Filename set to %s"), *Filename);
 }
 
+void ULiveLinkFaceCSVWriterComponent::SetSaveFolder(const FString& InFolderPath)
+{
+    if (FPaths::IsRelative(InFolderPath))
+    {
+        ExportFolder = FPaths::ProjectSavedDir() / InFolderPath;
+    }
+    else
+    {
+        ExportFolder = InFolderPath;
+    }
+    
+    // Ensure it doesnt end with a slash
+    ExportFolder = FPaths::GetPath(ExportFolder / TEXT(""));
+    UE_LOG(LogTemp, Log, TEXT("LiveLink CSV Writer: Export folder set to %s"), *ExportFolder);
+}
+
 bool ULiveLinkFaceCSVWriterComponent::StartRecording()
 {
     if (SubjectName.IsNone())
@@ -101,7 +118,8 @@ bool ULiveLinkFaceCSVWriterComponent::ExportFile()
         return false;
     }
 
-    const FString FullPath = FPaths::ProjectSavedDir() / TEXT("LiveLinkExports") / Filename;
+    //const FString FullPath = FPaths::ProjectSavedDir() / TEXT("LiveLinkExports") / Filename;
+    const FString FullPath = ExportFolder / Filename;
     const FString Dir = FPaths::GetPath(FullPath);
     IPlatformFile& PF = FPlatformFileManager::Get().GetPlatformFile();
     if (!PF.DirectoryExists(*Dir))

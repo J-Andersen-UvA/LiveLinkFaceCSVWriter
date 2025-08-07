@@ -30,6 +30,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
     void StopRecording();
 
+    UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
+    void SetSaveFolder(const FString& InFolderPath);
+
     /** Write all captured rows to disk */
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
     bool ExportFile();
@@ -45,6 +48,7 @@ private:
 
     /** CSV filename (just name.csv, saved under Saved/LiveLinkExports/) */
     FString Filename;
+    FString ExportFolder;
 
     /** Are we actively recording? */
     bool bIsRecording;
