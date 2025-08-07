@@ -304,3 +304,28 @@ FString ULiveLinkFaceCSVWriterComponent::FormatTimecode(const FQualifiedFrameTim
         TC.Hours, TC.Minutes, TC.Seconds, TC.Frames, Millis
     );
 }
+
+bool ULiveLinkFaceCSVWriterComponent::IsSubjectAvailable() const
+{
+    if (!LiveLinkClient)
+    {
+        return false;
+    }
+
+    // Get only those subjects that support the basic role
+    const TArray<FLiveLinkSubjectKey> Subjects =
+        LiveLinkClient->GetSubjectsSupportingRole(
+            ULiveLinkBasicRole::StaticClass(),
+            true,
+            false
+        );
+
+    for (const FLiveLinkSubjectKey& Key : Subjects)
+    {
+        if (Key.SubjectName == SubjectName)
+        {
+            return true;
+        }
+    }
+    return false;
+}

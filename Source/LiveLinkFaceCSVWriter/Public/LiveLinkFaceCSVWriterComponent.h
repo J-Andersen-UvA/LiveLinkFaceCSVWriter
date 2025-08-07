@@ -40,6 +40,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
     FString GetSaveFolder() const;
 
+    /** Returns true if SubjectName is known to the LiveLink client */
+    UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
+    bool IsSubjectAvailable() const;
+
 protected:
     virtual void BeginPlay() override;
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, 
