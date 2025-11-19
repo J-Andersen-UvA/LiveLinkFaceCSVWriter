@@ -1,4 +1,7 @@
 ﻿using UnrealBuildTool;
+using System;
+using System.IO;
+using UnrealBuildTool;
 
 public class LiveLinkFaceCSVWriter : ModuleRules
 {
@@ -12,11 +15,13 @@ public class LiveLinkFaceCSVWriter : ModuleRules
             }
         );
 
-        PrivateIncludePaths.AddRange(
-            new string[] {
-                // ... add other private include paths required here ...
-            }
-        );
+        PrivateDependencyModuleNames.AddRange(new string[]
+        {
+            "UnrealEd",
+            "EditorSubsystem",
+            "EditorFramework",
+            "LevelEditor"
+        });
 
         PublicDependencyModuleNames.AddRange(
             new string[]
@@ -35,9 +40,22 @@ public class LiveLinkFaceCSVWriter : ModuleRules
             {
                 "LiveLinkInterface",
                 "LiveLink",
-                "TimeManagement"
+                "TimeManagement",
+                "Projects"
             }
         );
+
+        // Check if LiveLinkMultiIPhone plugin exists
+        bool bHasLiveLinkMultiIPhone = false;
+        string PluginDirectory = Path.Combine(ModuleDirectory, "../../../LiveLinkMultiIPhone");
+        if (Directory.Exists(PluginDirectory))
+        {
+            PrivateDependencyModuleNames.Add("LiveLinkMultiIPhone");
+            bHasLiveLinkMultiIPhone = true;
+        }
+
+        // Define preprocessor macro for conditional compilation
+        PublicDefinitions.Add("WITH_LIVELINKMULTIIPHONE=" + (bHasLiveLinkMultiIPhone ? "1" : "0"));
 
         DynamicallyLoadedModuleNames.AddRange(
             new string[]

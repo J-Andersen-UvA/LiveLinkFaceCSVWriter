@@ -15,7 +15,7 @@
     "Modules": [
         {
             "Name": "LiveLinkFaceCSVWriter",
-            "Type": "Runtime",
+            "Type": "Editor",
             "LoadingPhase": "Default"
         }
     ],
@@ -23,6 +23,11 @@
         {
             "Name": "LiveLink",
             "Enabled": true
+        },
+        {
+            "Name": "LiveLinkMultiIPhone",
+            "Enabled": true,
+            "Optional": true
         }
     ]
 }
