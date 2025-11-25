@@ -1,6 +1,12 @@
 #include "ActiveLiveLinkCSVWriter.h"
 #include "Engine/Engine.h"
 
+#if WITH_LIVELINKMULTIIPHONE
+#include "LLFConnectionManagerLibrary.h"
+#include "LLFConnectionManager.h"
+#include "LLFDeviceRegistry.h"
+#endif
+
 UActiveLiveLinkCSVWriter::UActiveLiveLinkCSVWriter()
 {
 #if WITH_LIVELINKMULTIIPHONE
@@ -18,17 +24,17 @@ void UActiveLiveLinkCSVWriter::BeginPlay()
     Super::BeginPlay();
 
 #if WITH_LIVELINKMULTIIPHONE
-    // If we have a registry, bind to its event
-    if (DeviceRegistry)
-    {
-        DeviceRegistry->OnActiveIPhoneChanged.AddDynamic(this, &UActiveLiveLinkCSVWriter::OnActiveDeviceChanged);
-        
-        // Set initial subject from active device
-        if (DeviceRegistry->ActiveDevice.DeviceID != NAME_None)
-        {
-            SetSubjectName(FName(*DeviceRegistry->ActiveDevice.SubjectName));
-        }
-    }
+    // // If we have a registry, bind to its event
+    // if (DeviceRegistry)
+    // {
+    //     DeviceRegistry->OnActiveIPhoneChanged.AddDynamic(this, &UActiveLiveLinkCSVWriter::OnActiveDeviceChanged);
+    //     
+    //     // Set initial subject from active device
+    //     if (DeviceRegistry->ActiveDevice.DeviceID != NAME_None)
+    //     {
+    //         SetSubjectName(FName(*DeviceRegistry->ActiveDevice.SubjectName));
+    //     }
+    // }
 #endif
 }
 
@@ -47,7 +53,6 @@ void UActiveLiveLinkCSVWriter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 #if WITH_LIVELINKMULTIIPHONE
 void UActiveLiveLinkCSVWriter::SetDeviceRegistry(ULLFDeviceRegistry* InRegistry)
 {
-    // Unbind from old registry
     if (DeviceRegistry)
     {
         DeviceRegistry->OnActiveIPhoneChanged.RemoveDynamic(this, &UActiveLiveLinkCSVWriter::OnActiveDeviceChanged);
@@ -55,17 +60,13 @@ void UActiveLiveLinkCSVWriter::SetDeviceRegistry(ULLFDeviceRegistry* InRegistry)
 
     DeviceRegistry = InRegistry;
 
-    // Bind to new registry
     if (DeviceRegistry)
     {
         DeviceRegistry->OnActiveIPhoneChanged.AddDynamic(this, &UActiveLiveLinkCSVWriter::OnActiveDeviceChanged);
-        
-        // Set initial subject from active device
+
         if (DeviceRegistry->ActiveDevice.DeviceID != NAME_None)
         {
             SetSubjectName(FName(*DeviceRegistry->ActiveDevice.SubjectName));
-            UE_LOG(LogTemp, Log, TEXT("Active LiveLink CSV Writer: Set initial subject to %s"), 
-                *DeviceRegistry->ActiveDevice.SubjectName);
         }
     }
 }
@@ -247,9 +248,9 @@ bool UActiveLiveLinkCSVWriter::ExportNormalizedFile()
     }
     
     // Create filename by inserting "_Normalized" before .csv
-    FString BaseFilename = Filename;
-    BaseFilename.RemoveFromEnd(TEXT(".csv"));
-    FString NormalizedFilename = BaseFilename + TEXT("_Normalized.csv");
+    FString LocalBaseName = Filename;
+    LocalBaseName.RemoveFromEnd(TEXT(".csv"));
+    FString NormalizedFilename = LocalBaseName + TEXT("_Normalized.csv");
     
     const FString FullPath = ExportFolder / NormalizedFilename;
     const FString Dir = FPaths::GetPath(FullPath);
@@ -282,9 +283,9 @@ bool UActiveLiveLinkCSVWriter::ExportSwitchesLog()
     }
     
     // Create filename
-    FString BaseFilename = Filename;
-    BaseFilename.RemoveFromEnd(TEXT(".csv"));
-    FString SwitchesFilename = BaseFilename + TEXT("_Switches.csv");
+    FString LocalBaseName = Filename;
+    LocalBaseName.RemoveFromEnd(TEXT(".csv"));
+    FString SwitchesFilename = LocalBaseName + TEXT("_Switches.csv");
     
     const FString FullPath = ExportFolder / SwitchesFilename;
     const FString Dir = FPaths::GetPath(FullPath);
@@ -319,3 +320,18 @@ bool UActiveLiveLinkCSVWriter::ExportSwitchesLog()
         return false;
     }
 }
+
+// void UActiveLiveLinkCSVWriter::ClearDeviceRegistry()
+// {
+//     ULLFDeviceRegistry* DeviceRegistry = ConnMan->GetDeviceRegistry();
+//     if (!DeviceRegistry)
+//         return;
+// 
+//     if (DeviceRegistry)
+//     {
+//         DeviceRegistry->OnDeviceActivated.RemoveDynamic(this, &UActiveLiveLinkCSVWriter::HandleDeviceActivated);
+//         DeviceRegistry->OnDeviceDeactivated.RemoveDynamic(this, &UActiveLiveLinkCSVWriter::HandleDeviceDeactivated);
+//     }
+// 
+//     DeviceRegistry = nullptr;
+// }

@@ -9,7 +9,6 @@
 //#include "Roles/LiveLinkFaceRole.h"
 #include "Roles/LiveLinkBasicRole.h"
 
-
 ULiveLinkFaceCSVWriterComponent::ULiveLinkFaceCSVWriterComponent()
     : SubjectName(NAME_None)
     , Filename(TEXT("LiveLinkFaceData.csv"))

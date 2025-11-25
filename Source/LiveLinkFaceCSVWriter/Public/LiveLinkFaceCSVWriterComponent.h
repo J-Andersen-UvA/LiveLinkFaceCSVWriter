@@ -26,6 +26,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
     FName GetSubjectName() const { return SubjectName; }
 
+    UPROPERTY(BlueprintReadWrite, Category = "LiveLink CSV Writer")
+    FString BaseFilename;
+
     /** Set output CSV filename (will append ".csv" if missing) */
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer")
     void SetFilename(const FString& InFilename);

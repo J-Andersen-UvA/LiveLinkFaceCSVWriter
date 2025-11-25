@@ -65,6 +65,15 @@ public:
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer Manager")
     void ClearAllWriters();
 
+    UFUNCTION(BlueprintCallable, Category = "LiveLink CSV Writer")
+    void RefreshWriters();
+
+    UFUNCTION(BlueprintCallable, Category = "LiveLink CSV Writer")
+    FName DetectSingleIPhoneSubject() const;
+
+    UFUNCTION(BlueprintCallable)
+    void ApplyNameToFilenames(const FString& Name);
+
     // ========== Recording Control ==========
 
     /** Start recording on all registered writers */
@@ -78,6 +87,8 @@ public:
     /** Check if any writer is currently recording */
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer Manager")
     bool IsRecording() const { return bIsRecording; }
+
+    void SetLastExportedFiles();
 
     /** Export all recorded data to files */
     UFUNCTION(BlueprintCallable, Category="LiveLink CSV Writer Manager")
@@ -110,6 +121,9 @@ public:
     /** Broadcast when export completes */
     UPROPERTY(BlueprintAssignable, Category="LiveLink CSV Writer Manager")
     FOnExportComplete OnExportComplete;
+
+    UPROPERTY(BlueprintReadOnly)
+    TArray<FString> LastExportedFiles;
 
 private:
     /** Tick function called by timer */

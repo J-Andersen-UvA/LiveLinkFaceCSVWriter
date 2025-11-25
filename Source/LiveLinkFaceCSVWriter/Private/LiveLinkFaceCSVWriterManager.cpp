@@ -1,10 +1,16 @@
-#include "LiveLinkFaceCSVWriterManager.h"
+﻿#include "LiveLinkFaceCSVWriterManager.h"
 #include "LiveLinkFaceCSVWriterComponent.h"
 #include "ActiveLiveLinkCSVWriter.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "Misc/Paths.h"
+
+#if WITH_LIVELINKMULTIIPHONE
+#include "LLFConnectionManagerLibrary.h"
+#include "LLFConnectionManager.h"
+#include "LLFDeviceRegistry.h"
+#endif
 
 #if WITH_EDITOR
 #include "Editor.h"
@@ -96,6 +102,10 @@ ULiveLinkFaceCSVWriterComponent* ULiveLinkFaceCSVWriterManager::CreateWriterForS
         NewWriter->SetFilename(Filename);
         NewWriter->SetSaveFolder(ExportPath);
         
+        FString BaseName = Filename;
+        BaseName.RemoveFromEnd(TEXT(".csv"));
+        NewWriter->BaseFilename = BaseName;
+
         // Register with world
         NewWriter->RegisterComponentWithWorld(World);
         
@@ -164,6 +174,10 @@ UActiveLiveLinkCSVWriter* ULiveLinkFaceCSVWriterManager::CreateActivePhoneWriter
         ActiveWriter->SetFilename(Filename);
         ActiveWriter->SetSaveFolder(ExportPath);
         
+        FString BaseName = Filename;
+        BaseName.RemoveFromEnd(TEXT(".csv"));
+        ActiveWriter->BaseFilename = BaseName;
+
         // Register with world
         ActiveWriter->RegisterComponentWithWorld(World);
         
@@ -225,6 +239,149 @@ void ULiveLinkFaceCSVWriterManager::ClearAllWriters()
     UE_LOG(LogTemp, Log, TEXT("LiveLink CSV Writer Manager: Cleared all writers"));
 }
 
+void ULiveLinkFaceCSVWriterManager::RefreshWriters()
+{
+#if WITH_LIVELINKMULTIIPHONE
+
+    ULLFConnectionManager* ConnMan = ULLFConnectionManagerLibrary::GetConnectionManager();
+    if (!ConnMan)
+        return;
+
+    ULLFDeviceRegistry* Registry = ConnMan->GetDeviceRegistry();
+    if (!Registry)
+        return;
+
+    const TArray<FLLFDevice>& Devices = Registry->Devices;
+
+    Registry->RefreshDevices();
+    ClearAllWriters();
+
+    if (Devices.Num() <= 1)
+    {
+        CreateWriterForDevice(Devices.Num() == 1 ? Devices[0] : FLLFDevice());
+        return;
+    }
+
+    for (const FLLFDevice& Device : Devices)
+        CreateWriterForDevice(Device);
+
+    CreateActivePhoneWriter(Registry, TEXT("ActivePhone.csv"));
+
+#else
+
+    // Fallback: plugin not installed
+    UE_LOG(LogTemp, Warning, TEXT("CSVWriter: MultiIPhone plugin missing → detecting single iPhone via LiveLink."));
+
+    ClearAllWriters();
+
+    FName Subject = DetectSingleIPhoneSubject();
+
+    if (Subject.IsNone())
+    {
+        UE_LOG(LogTemp, Error, TEXT("CSVWriter: No iPhone LiveLink sources detected."));
+        return;
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("CSVWriter: Single iPhone detected → %s"), *Subject.ToString());
+
+    CreateWriterForSubject(Subject, Subject.ToString());
+
+#endif
+}
+
+bool IsIPhoneSource(const FGuid& SourceGuid, ILiveLinkClient* Client)
+{
+    if (!Client)
+        return false;
+
+    // Get source type/name
+    FText SourceType = Client->GetSourceType(SourceGuid);
+    FString SourceTypeName = SourceType.ToString();
+
+    // Check if it's an iOS/iPhone source
+    // Patterns to look for: "iPhone", "iOS", "Apple ARKit Face", etc.
+    if (SourceTypeName.Contains(TEXT("iPhone")) ||
+        SourceTypeName.Contains(TEXT("iOS")) ||
+        SourceTypeName.Contains(TEXT("Apple ARKit")))
+    {
+        return true;
+    }
+
+    // Alternative: Check subject names for iPhone patterns
+    TArray<FLiveLinkSubjectKey> Subjects = Client->GetSubjects(true, false);
+    for (const FLiveLinkSubjectKey& Subject : Subjects)
+    {
+        if (Subject.Source == SourceGuid)
+        {
+            FString SubjectName = Subject.SubjectName.ToString();
+            if (SubjectName.Contains(TEXT("iPhone")) ||
+                SubjectName.Contains(TEXT("iOS")))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+TArray<FName> GetAllSubjectNamesFromGUID(const FGuid& SourceGuid, ILiveLinkClient* Client)
+{
+    TArray<FName> SubjectNames;
+
+    if (!Client)
+        return SubjectNames;
+
+    // Get all subjects (enabled and disabled)
+    TArray<FLiveLinkSubjectKey> AllSubjects = Client->GetSubjects(true, true);
+
+    // Filter subjects that belong to this source
+    for (const FLiveLinkSubjectKey& SubjectKey : AllSubjects)
+    {
+        if (SubjectKey.Source == SourceGuid)
+        {
+            SubjectNames.Add(SubjectKey.SubjectName.Name);
+        }
+    }
+
+    return SubjectNames;
+}
+FName ULiveLinkFaceCSVWriterManager::DetectSingleIPhoneSubject() const
+{
+    if (!IModularFeatures::Get().IsModularFeatureAvailable(ILiveLinkClient::ModularFeatureName))
+    {
+        return NAME_None;
+    }
+
+    ILiveLinkClient& Client =
+        IModularFeatures::Get().GetModularFeature<ILiveLinkClient>(ILiveLinkClient::ModularFeatureName);
+
+    TArray<FGuid> SourceGuids = Client.GetSources();
+
+    for (const FGuid& SourceGuid : SourceGuids)
+    {
+        if (!IsIPhoneSource(SourceGuid, &Client))
+            continue;
+
+        TArray<FName> SubjectNames = GetAllSubjectNamesFromGUID(SourceGuid, &Client);
+
+        return SubjectNames[0];
+    }
+
+    return NAME_None;
+}
+
+void ULiveLinkFaceCSVWriterManager::ApplyNameToFilenames(const FString& Name)
+{
+    for (ULiveLinkFaceCSVWriterComponent* Writer : Writers)
+    {
+        if (!Writer) continue;
+
+        FString NewName = Name + TEXT("_") + Writer->BaseFilename + TEXT(".csv");
+        Writer->SetFilename(NewName);
+    }
+}
+
 bool ULiveLinkFaceCSVWriterManager::StartRecording()
 {
     if (Writers.Num() == 0)
@@ -237,9 +394,14 @@ bool ULiveLinkFaceCSVWriterManager::StartRecording()
 
     for (ULiveLinkFaceCSVWriterComponent* Writer : Writers)
     {
-        if (Writer && Writer->StartRecording())
+        if (Writer)
         {
-            bAnyStarted = true;
+            // Ensure component is registered
+            Writer->ReregisterComponent();
+            if (Writer->StartRecording())
+            {
+                bAnyStarted = true;
+            }
         }
     }
 
@@ -324,7 +486,38 @@ bool ULiveLinkFaceCSVWriterManager::ExportAllFiles()
     UE_LOG(LogTemp, Log, TEXT("LiveLink CSV Writer Manager: Exported %d/%d writers"), 
         SuccessCount, Writers.Num());
 
+    SetLastExportedFiles();
+
     return bSuccess;
+}
+
+void ULiveLinkFaceCSVWriterManager::SetLastExportedFiles()
+{
+    LastExportedFiles.Empty();
+
+    for (ULiveLinkFaceCSVWriterComponent* Writer : Writers)
+    {
+        if (!Writer) continue;
+
+        if (Writer->ExportFile())
+        {
+            // Writer->ExportFile() already knows the filename and folder
+            FString FullBasePath = Writer->GetSaveFolder() / Writer->GetFilename();
+            LastExportedFiles.Add(FullBasePath);
+
+            // If ActivePhone writer, add normalized + switches
+            if (Writer->GetName().Contains("ActivePhone"))
+            {
+                FString BaseNoExt = FPaths::GetBaseFilename(Writer->GetFilename());
+
+                FString Switches = FullBasePath.Replace(TEXT(".csv"), TEXT("_Switches.csv"));
+                FString Normalized = FullBasePath.Replace(TEXT(".csv"), TEXT("_Normalized.csv"));
+
+                LastExportedFiles.Add(Switches);
+                LastExportedFiles.Add(Normalized);
+            }
+        }
+    }
 }
 
 void ULiveLinkFaceCSVWriterManager::SetExportPath(const FString& FolderPath)
