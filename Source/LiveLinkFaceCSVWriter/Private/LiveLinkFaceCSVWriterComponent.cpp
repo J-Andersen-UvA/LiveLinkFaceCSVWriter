@@ -215,7 +215,7 @@ bool ULiveLinkFaceCSVWriterComponent::InitializeCSVHeader()
 
     TArray<FString> HeaderCols;
     HeaderCols.Add(TEXT("Timecode"));
-    HeaderCols.Add(TEXT("NumProperties"));
+    HeaderCols.Add(TEXT("BlendshapeCount"));
     for (const FName& N : CurveNames)
     {
         HeaderCols.Add(N.ToString());
