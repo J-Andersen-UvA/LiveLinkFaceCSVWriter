@@ -1,0 +1,1 @@
+The classic way of getting a LLF recording in csv format is by recording directly on the phone. This library writes the stream that comes into unreal engine directly to a csv, so no more need of recording directly on the phone (and no more osc communication between the phone and whatever).
